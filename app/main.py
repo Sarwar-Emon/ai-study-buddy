@@ -4,12 +4,15 @@ import logging
 import os
 import secrets
 import threading
+from contextlib import asynccontextmanager
 
 import openai
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, Response, UploadFile
+from fastapi.staticfiles import StaticFiles
 
 from app.chunking import PdfError
 from app.config import Settings, get_settings
+from app.demo import DemoGuard
 from app.embeddings import FakeEmbedder, OpenAIEmbedder
 from app.llm import FakeAnswerer, OpenAIAnswerer
 from app.ratelimit import RateLimiter
@@ -21,6 +24,7 @@ from app.schemas import (
     AttemptsIn,
     CitationOut,
     ClaimOut,
+    ConfigOut,
     DocumentOut,
     FlashcardOut,
     FlashcardsOut,
@@ -110,9 +114,18 @@ def create_app(
     study: StudyService | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
-    app = FastAPI(title="AI Study Buddy", version="2.0.0")
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        # In demo mode, load the sample document in the background so the port opens at once.
+        if settings.demo_mode and settings.sample_pdf:
+            threading.Thread(target=load_sample, daemon=True).start()
+        yield
+
+    app = FastAPI(title="AI Study Buddy", version="2.0.0", lifespan=lifespan)
     ask_limiter = RateLimiter(max_requests=20, window_seconds=60)
     generate_limiter = RateLimiter(max_requests=10, window_seconds=60)
+    demo = DemoGuard(settings.demo_daily_requests) if settings.demo_mode else None
     state: dict = {"service": service, "study": study}
     # Requests run in parallel threads. Without this lock, two first requests would both
     # try to open the same Chroma database at once, and Chroma fails when that happens.
@@ -139,6 +152,28 @@ def create_app(
                         raise HTTPException(status_code=503, detail=str(exc)) from exc
         return state["study"]
 
+    def spend_demo_budget() -> None:
+        if demo is not None and not demo.take():
+            raise HTTPException(
+                status_code=429,
+                detail="The demo has reached its limit for today. Please try again tomorrow, "
+                "or run it yourself from the GitHub repository.",
+            )
+
+    def load_sample() -> None:
+        try:
+            rag = get_service()
+            if rag.list_documents():
+                return
+            with open(settings.sample_pdf, "rb") as f:
+                data = f.read()
+            rag.ingest_pdf(os.path.basename(settings.sample_pdf), data)
+            log.info("Loaded the sample document.")
+        except Exception:  # the demo still works without it, so never crash the server
+            log.exception("Could not load the sample document.")
+
+    app.state.load_sample = load_sample
+
     def caller_of(request: Request) -> str:
         return request.headers.get("x-api-key") or (request.client.host if request.client else "?")
 
@@ -146,6 +181,7 @@ def create_app(
         """Rate-limit, run a study task, and turn its failures into clean HTTP errors."""
         if not generate_limiter.allow(caller_of(request)):
             raise HTTPException(status_code=429, detail="Too many requests. Please slow down.")
+        spend_demo_budget()
         try:
             return work()
         except NotFoundError as exc:
@@ -172,6 +208,16 @@ def create_app(
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    @app.get("/api/v1/config", response_model=ConfigOut)
+    def public_config() -> ConfigOut:
+        """Lets the page know whether to show the demo banner. Contains nothing secret."""
+        return ConfigOut(
+            demo=settings.demo_mode,
+            daily_limit=settings.demo_daily_requests,
+            max_documents=settings.demo_max_docs,
+            max_upload_mb=settings.max_upload_mb,
+        )
+
     @app.post("/api/v1/documents", response_model=DocumentOut, dependencies=auth)
     def upload_document(
         response: Response,
@@ -190,6 +236,15 @@ def create_app(
             )
         if not data.startswith(PDF_MAGIC):
             raise HTTPException(status_code=415, detail="This file is not a real PDF.")
+
+        if demo is not None:
+            known = {d.doc_id for d in rag.list_documents()}
+            if len(known) >= settings.demo_max_docs and rag.make_doc_id(data) not in known:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"The demo holds up to {settings.demo_max_docs} documents. Delete one first.",
+                )
+            spend_demo_budget()
 
         try:
             record, created = rag.ingest_pdf(name, data)
@@ -237,6 +292,7 @@ def create_app(
 
         if not ask_limiter.allow(caller_of(request)):
             raise HTTPException(status_code=429, detail="Too many questions. Please slow down.")
+        spend_demo_budget()
 
         try:
             result = rag.ask(question, body.top_k or settings.top_k)
@@ -329,6 +385,10 @@ def create_app(
     ) -> ReviewOut:
         filename, summary = generating(request, lambda: learn.review(body.doc_id, body.page))
         return ReviewOut(filename=filename, page=body.page, summary=summary)
+
+    # Serve the built frontend last, so it never shadows an API route.
+    if settings.static_dir and os.path.isdir(settings.static_dir):
+        app.mount("/", StaticFiles(directory=settings.static_dir, html=True), name="web")
 
     return app
 

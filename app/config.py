@@ -39,6 +39,17 @@ class Settings(BaseSettings):
     max_upload_mb: int = 20
     max_question_chars: int = 1000
 
+    # Public demo mode (for a hosted copy that strangers can open). It protects your model
+    # quota: a shared daily cap on requests that call the model, a small document limit,
+    # and a banner that tells visitors it is a demo.
+    demo_mode: bool = False
+    demo_daily_requests: int = 150  # model-using requests per day, shared by all visitors
+    demo_max_docs: int = 4
+    sample_pdf: str = ""  # loaded on startup in demo mode when the library is empty
+
+    # Serve the built frontend from this folder (used by the single-container deploy)
+    static_dir: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

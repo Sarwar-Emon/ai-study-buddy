@@ -2,12 +2,14 @@ import { DragEvent, FormEvent, useCallback, useEffect, useRef, useState } from "
 import {
   ask,
   deleteDocument,
+  getConfig,
   listDocuments,
   listGaps,
   uploadDocument,
   type Citation,
   type DocumentInfo,
   type Gap,
+  type PublicConfig,
   type Verification,
 } from "./api";
 import Flashcards from "./study/Flashcards";
@@ -69,6 +71,11 @@ function errorText(err: unknown): string {
 export default function App() {
   const [docs, setDocs] = useState<DocumentInfo[]>([]);
   const [gaps, setGaps] = useState<Gap[]>([]);
+  const [config, setConfig] = useState<PublicConfig | null>(null);
+
+  useEffect(() => {
+    void getConfig().then(setConfig);
+  }, []);
   const [messages, setMessages] = useState<Message[]>([]);
   const [question, setQuestion] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -183,6 +190,13 @@ export default function App() {
 
   return (
     <div className="shell">
+      {config?.demo && (
+        <p className="demo-note" role="note">
+          Public demo. Please do not upload private files. It holds up to {config.max_documents} PDFs
+          of {config.max_upload_mb} MB each, and uses a shared daily limit, so it can stop for the
+          day. Idle copies may take a minute to wake up.
+        </p>
+      )}
       <header className="topbar">
         <div className="brand">
           <Logo />

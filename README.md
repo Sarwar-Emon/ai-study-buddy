@@ -211,3 +211,21 @@ It prints **Hit@1**, **Hit@k** (is the right page in the top k results?) and **M
 - **Everyone sees every document.** There are no user accounts or per-user collections.
 - **Answer quality depends on the LLM.** Citations show where an answer came from, but they do not prove the answer is correct. Check important answers against the source page.
 - Public deployment would need real authentication, HTTPS, monitoring, and a security review.
+
+## Live demo on Render (free)
+
+The repo includes `Dockerfile.render` and `render.yaml`, which run the whole app as one container.
+
+1. Push the repo to GitHub.
+2. On render.com, choose **New → Blueprint**, pick this repo, and apply.
+3. When asked for `OPENAI_API_KEY`, paste a Gemini key. Use a separate key for the demo so you can delete it later.
+4. After the build finishes, Render gives you a URL like `https://ai-study-buddy.onrender.com`.
+
+Demo mode (`DEMO_MODE=true`) protects your free quota:
+
+- All visitors share a daily cap on requests that call the model (`DEMO_DAILY_REQUESTS`, default 150).
+- Uploads are limited to `MAX_UPLOAD_MB` (5 on Render) and `DEMO_MAX_DOCS` documents (default 4).
+- A sample study guide (`samples/study_sample.pdf`) loads on startup so visitors can try it at once.
+- A banner tells visitors not to upload private files.
+
+On the free plan the app sleeps when idle, so the first visit can take about a minute, and the disk is erased on each restart. Both are fine for a demo.

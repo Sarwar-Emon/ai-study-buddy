@@ -64,9 +64,14 @@ class RagService:
         return self._verifier
 
     # ----- indexing -----
+    @staticmethod
+    def make_doc_id(data: bytes) -> str:
+        """The same file always gets the same id, whatever it is named."""
+        return hashlib.sha256(data).hexdigest()[:16]
+
     def ingest_pdf(self, filename: str, data: bytes) -> tuple[DocumentRecord, bool]:
         """Index a PDF. Returns (record, created). Same file twice is a no-op."""
-        doc_id = hashlib.sha256(data).hexdigest()[:16]
+        doc_id = self.make_doc_id(data)
         if self._store.has_document(doc_id):
             record = next(d for d in self._store.list_documents() if d.doc_id == doc_id)
             return record, False

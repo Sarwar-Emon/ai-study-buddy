@@ -108,3 +108,10 @@ class ReviewOut(BaseModel):
     filename: str
     page: int
     summary: str
+
+
+class ConfigOut(BaseModel):
+    demo: bool
+    daily_limit: int
+    max_documents: int
+    max_upload_mb: int

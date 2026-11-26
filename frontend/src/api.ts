@@ -43,6 +43,22 @@ async function failure(res: Response): Promise<Error> {
   return new Error(`Request failed (${res.status}).`);
 }
 
+export interface PublicConfig {
+  demo: boolean;
+  daily_limit: number;
+  max_documents: number;
+  max_upload_mb: number;
+}
+
+export async function getConfig(): Promise<PublicConfig | null> {
+  try {
+    const res = await fetch("/api/v1/config");
+    return res.ok ? res.json() : null;
+  } catch {
+    return null; // the banner is optional, so never block the app on it
+  }
+}
+
 export async function listDocuments(): Promise<DocumentInfo[]> {
   const res = await fetch("/api/v1/documents");
   if (!res.ok) throw await failure(res);

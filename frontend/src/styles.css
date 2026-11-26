@@ -921,3 +921,22 @@ button.quiet {
     transition: none !important;
   }
 }
+
+.demo-note {
+  margin: 0;
+  padding: 8px 24px;
+  background: var(--mark-soft);
+  color: #4a3b00;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  text-align: center;
+  border-bottom: 1px solid var(--mark);
+}
+
+@media (prefers-color-scheme: dark) {
+  .demo-note {
+    background: #3a3210;
+    color: #f3e7a8;
+    border-bottom-color: #6b5a14;
+  }
+}

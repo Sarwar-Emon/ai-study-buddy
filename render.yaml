@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: ai-study-buddy
+    runtime: docker
+    dockerfilePath: ./Dockerfile.render
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false   # you paste your Gemini key in the Render dashboard
+      - key: OPENAI_BASE_URL
+        value: https://generativelanguage.googleapis.com/v1beta/openai/
+      - key: EMBEDDING_MODEL
+        value: gemini-embedding-2
+      - key: CHAT_MODEL
+        value: gemini-3.1-flash-lite
+      - key: MAX_UPLOAD_MB
+        value: "5"
+      - key: DEMO_DAILY_REQUESTS
+        value: "150"
