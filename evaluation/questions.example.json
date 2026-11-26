@@ -1,0 +1,12 @@
+[
+  {
+    "question": "What features does the model use to detect phishing URLs?",
+    "filename": "my_paper.pdf",
+    "page": 3
+  },
+  {
+    "question": "How was the dataset split into training and test sets?",
+    "filename": "my_paper.pdf",
+    "page": 5
+  }
+]

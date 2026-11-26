@@ -1,0 +1,28 @@
+services:
+  backend:
+    build: .
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+    volumes:
+      - study_data:/data
+    networks: [internal]
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    environment:
+      API_KEY: ${API_KEY:?Set API_KEY in .env}
+    ports:
+      - "127.0.0.1:8080:80" # only reachable from your own computer
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks: [internal]
+    restart: unless-stopped
+
+volumes:
+  study_data:
+
+networks:
+  internal:
